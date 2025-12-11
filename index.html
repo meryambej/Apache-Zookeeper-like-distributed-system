@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZooKeeper-like Distributed System - v2.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1.1em;
+        }
+
+        .control-panel {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+            padding: 20px;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 15px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-crash {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .status-bar {
+            margin-left: auto;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 10px;
+            font-size: 0.95em;
+        }
+
+        .status-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #fbbf24;
+        }
+
+        .game-phase {
+            background: rgba(59, 130, 246, 0.3) !important;
+            border: 2px solid #3b82f6;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+
+        .node {
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .node:hover {
+            transform: translateX(5px);
+        }
+
+        .node-leader {
+            border-color: #fbbf24;
+            background: rgba(251, 191, 36, 0.1);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+        }
+
+        .node-crashed {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            opacity: 0.6;
+        }
+
+        .node-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .node-title {
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge-leader {
+            background: #fbbf24;
+            color: #000;
+        }
+
+        .badge-follower {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .badge-crashed {
+            background: #ef4444;
+            color: #fff;
+        }
+
+        .node-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            font-size: 0.9em;
+            color: #cbd5e1;
+        }
+
+        .stat-item {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 8px;
+            border-radius: 6px;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.85em;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #f1f5f9;
+            font-size: 1.1em;
+        }
+
+        .client {
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .client:hover {
+            transform: translateX(5px);
+        }
+
+        .client-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .client-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+
+        .client-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .client-connection {
+            font-size: 0.85em;
+            color: #94a3b8;
+        }
+
+        .client-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .client-input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.5);
+            color: #f1f5f9;
+            font-size: 1em;
+        }
+
+        .client-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .btn-action {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-set-target {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            animation: glow 2s infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.8); }
+        }
+
+        .log-panel {
+            height: 600px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .log-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-panel::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 10px;
+        }
+
+        .log-panel::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.5);
+            border-radius: 10px;
+        }
+
+        .log-panel::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.7);
+        }
+
+        .log-entry {
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-system { background: rgba(100, 116, 139, 0.2); border-color: #64748b; }
+        .log-write { background: rgba(59, 130, 246, 0.2); border-color: #3b82f6; }
+        .log-proposal { background: rgba(139, 92, 246, 0.2); border-color: #8b5cf6; }
+        .log-ack { background: rgba(34, 197, 94, 0.2); border-color: #22c55e; }
+        .log-commit { background: rgba(168, 85, 247, 0.2); border-color: #a855f7; }
+        .log-success { background: rgba(16, 185, 129, 0.2); border-color: #10b981; }
+        .log-error { background: rgba(239, 68, 68, 0.2); border-color: #ef4444; }
+        .log-election { background: rgba(251, 191, 36, 0.2); border-color: #fbbf24; }
+        .log-guess { background: rgba(236, 72, 153, 0.2); border-color: #ec4899; }
+
+        .log-timestamp {
+            font-size: 0.8em;
+            color: #94a3b8;
+            margin-right: 10px;
+        }
+
+        .instructions {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .instructions h3 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            color: #10b981;
+        }
+
+        .instructions ol {
+            padding-left: 25px;
+            line-height: 1.8;
+            color: #cbd5e1;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        .instructions strong {
+            color: #f1f5f9;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="fade-in">
+            <h1>🖥️ ZooKeeper-like Distributed System</h1>
+            <p class="subtitle">Leader Election • Log Replication • Fault Tolerance • Number Guessing Game</p>
+        </header>
+
+        <div class="control-panel fade-in">
+            <button class="btn-start" onclick="startSystem()" id="startBtn">
+                <span>▶️</span> Start System
+            </button>
+            <button class="btn-stop" onclick="stopSystem()" id="stopBtn" disabled>
+                <span>⏸️</span> Stop System
+            </button>
+            <button class="btn-crash" onclick="crashLeader()" id="crashBtn" disabled>
+                <span>⚡</span> Crash Leader
+            </button>
+            <button class="btn-reset" onclick="resetSystem()">
+                <span>🔄</span> Reset All
+            </button>
+            
+            <div class="status-bar">
+                <div class="status-item">
+                    <span>🎯 Target:</span>
+                    <span class="status-value" id="currentTarget">Not Set</span>
+                </div>
+                <div class="status-item">
+                    <span>📈 Round:</span>
+                    <span class="status-value" id="currentRound">1</span>
+                </div>
+                <div class="status-item game-phase" id="gamePhase">
+                    🎲 Waiting for first target...
+                </div>
+                <div class="status-item">
+                    <span>🔌 Status:</span>
+                    <span class="status-value" id="systemStatus">Stopped</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <!-- Nodes Panel -->
+            <div class="panel fade-in">
+                <div class="panel-header">
+                    <span>🖥️</span>
+                    <span>Distributed Nodes</span>
+                </div>
+                <div id="nodesContainer"></div>
+            </div>
+
+            <!-- Clients Panel -->
+            <div class="panel fade-in">
+                <div class="panel-header">
+                    <span>👥</span>
+                    <span>Client Applications</span>
+                </div>
+                <div id="clientsContainer"></div>
+            </div>
+
+            <!-- Logs Panel -->
+            <div class="panel fade-in">
+                <div class="panel-header">
+                    <span>📋</span>
+                    <span>Activity Log</span>
+                </div>
+                <div class="log-panel" id="logsContainer"></div>
+            </div>
+        </div>
+
+        <div class="instructions fade-in">
+            <h3>
+                <span>✅</span>
+                <span>How to Play the Number Guessing Game</span>
+            </h3>
+            <ol>
+                <li><strong>Click "Start System"</strong> to initialize all nodes and begin heartbeat monitoring</li>
+                <li><strong>Round 1 - Set Target:</strong> The FIRST client to enter a number (0-100) sets the initial target (orange button)</li>
+                <li><strong>Round 2+ - Make Guesses:</strong> OTHER clients enter numbers to guess (blue button). The closest guess becomes the NEW target!</li>
+                <li><strong>Example:</strong> Alice sets 50 → Bob guesses 45 (distance 5) → Charlie guesses 52 (distance 2) → Charlie wins! New target is 52</li>
+                <li><strong>Test Fault Tolerance:</strong> Click "Crash Leader" to simulate failure and watch automatic election</li>
+                <li><strong>Keep Playing:</strong> After election, continue guessing with the new leader!</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let nodes = [];
+        let clients = [];
+        let logs = [];
+        let isRunning = false;
+        let currentTarget = null;
+        let currentRound = 1;
+        let pendingGuesses = [];
+
+        const clientColors = ['#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#f59e0b'];
+        const clientNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
+
+        function initializeSystem() {
+            nodes = [
+                { id: 0, role: 'leader', epoch: 1, seq: 0, log: [], status: 'active' },
+                { id: 1, role: 'follower', epoch: 1, seq: 0, log: [], status: 'active' },
+                { id: 2, role: 'follower', epoch: 1, seq: 0, log: [], status: 'active' },
+                { id: 3, role: 'follower', epoch: 1, seq: 0, log: [], status: 'active' },
+                { id: 4, role: 'follower', epoch: 1, seq: 0, log: [], status: 'active' }
+            ];
+
+            clients = clientNames.map((name, idx) => ({
+                id: idx,
+                name: name,
+                connected: idx,
+                color: clientColors[idx]
+            }));
+
+            logs = [];
+            currentTarget = null;
+            currentRound = 1;
+            pendingGuesses = [];
+
+            updateGamePhase('🎲 Waiting for first target...');
+            addLog('System initialized with 1 leader and 4 followers', 'system');
+            renderAll();
+        }
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.push({ timestamp, message, type });
+            renderLogs();
+        }
+
+        function updateGamePhase(text, color = null) {
+            const phaseElement = document.getElementById('gamePhase');
+            phaseElement.textContent = text;
+            if (color) {
+                phaseElement.style.background = color;
+            }
+        }
+
+        function startSystem() {
+            isRunning = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('crashBtn').disabled = false;
+            document.getElementById('systemStatus').textContent = 'Running';
+            document.getElementById('systemStatus').style.color = '#10b981';
+            addLog('✅ System started - nodes active and monitoring', 'success');
+        }
+
+        function stopSystem() {
+            isRunning = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('crashBtn').disabled = true;
+            document.getElementById('systemStatus').textContent = 'Stopped';
+            document.getElementById('systemStatus').style.color = '#ef4444';
+            addLog('⏸️ System stopped', 'system');
+        }
+
+        function resetSystem() {
+            isRunning = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('crashBtn').disabled = true;
+            document.getElementById('systemStatus').textContent = 'Stopped';
+            document.getElementById('systemStatus').style.color = '#64748b';
+            initializeSystem();
+            addLog('🔄 System reset to initial state', 'system');
+        }
+
+        function handleWrite(clientId, value) {
+            if (!isRunning) {
+                alert('Please start the system first!');
+                return;
+            }
+
+            const client = clients[clientId];
+            const connectedNode = nodes[client.connected];
+
+            addLog(`📝 ${client.name} sends WRITE(${value}) to Node ${connectedNode.id}`, 'write');
+
+            if (connectedNode.role === 'follower') {
+                addLog(`🔄 Node ${connectedNode.id} forwards to Leader`, 'write');
+                setTimeout(() => processProposal(value, 'WRITE', client.name), 300);
+            } else {
+                processProposal(value, 'WRITE', client.name);
+            }
+        }
+
+        function processProposal(value, operation, clientName) {
+            const leader = nodes.find(n => n.role === 'leader' && n.status === 'active');
+            if (!leader) {
+                addLog('❌ No active leader available', 'error');
+                return;
+            }
+
+            leader.seq++;
+            const proposal = {
+                epoch: leader.epoch,
+                seq: leader.seq,
+                operation: operation,
+                value: parseInt(value),
+                status: 'PROPOSED',
+                clientName: clientName
+            };
+
+            leader.log.push(proposal);
+            addLog(`📋 Leader (Node ${leader.id}) creates PROPOSAL: epoch=${proposal.epoch}, seq=${proposal.seq}, value=${value}`, 'proposal');
+
+            setTimeout(() => {
+                const followers = nodes.filter(n => n.role === 'follower' && n.status === 'active');
+                let acks = 1;
+                const quorum = Math.floor(nodes.length / 2) + 1;
+
+                followers.forEach((follower, index) => {
+                    setTimeout(() => {
+                        follower.log.push(proposal);
+                        addLog(`✅ Node ${follower.id} ACKs proposal (${acks + 1}/${nodes.length})`, 'ack');
+                        acks++;
+
+                        if (acks >= quorum && index === followers.length - 1) {
+                            setTimeout(() => commitProposal(proposal), 300);
+                        }
+                    }, index * 200);
+                });
+
+                renderNodes();
+            }, 500);
+        }
+
+        function commitProposal(proposal) {
+            addLog(`🎯 QUORUM REACHED! Broadcasting COMMIT for seq=${proposal.seq}`, 'commit');
+
+            nodes.forEach(node => {
+                if (node.status === 'active') {
+                    const entry = node.log.find(e => e.epoch === proposal.epoch && e.seq === proposal.seq);
+                    if (entry) entry.status = 'COMMITTED';
+                }
+            });
+
+            if (proposal.operation === 'WRITE' || proposal.operation === 'GUESS') {
+                currentTarget = proposal.value;
+                document.getElementById('currentTarget').textContent = currentTarget;
+                
+                if (proposal.operation === 'WRITE') {
+                    updateGamePhase('🎲 Target set! Now GUESS the number!', 'rgba(16, 185, 129, 0.3)');
+                } else {
+                    updateGamePhase('🎲 New target! Keep guessing!', 'rgba(16, 185, 129, 0.3)');
+                    currentRound++;
+                    document.getElementById('currentRound').textContent = currentRound;
+                }
+                
+                addLog(`✨ New target committed: ${currentTarget}`, 'success');
+            }
+
+            renderNodes();
+            renderClients();
+        }
+
+        function handleGuess(clientId, value) {
+            if (!isRunning) {
+                alert('Please start the system first!');
+                return;
+            }
+
+            if (currentTarget === null) {
+                alert('No target set yet! Someone needs to set a target first.');
+                return;
+            }
+
+            const client = clients[clientId];
+            const distance = Math.abs(parseInt(value) - currentTarget);
+
+            addLog(`🎯 ${client.name} guesses ${value} (distance: ${distance} from ${currentTarget})`, 'guess');
+
+            setTimeout(() => {
+                pendingGuesses.push({ clientName: client.name, value: parseInt(value), distance });
+                
+                const closest = pendingGuesses.reduce((best, current) => 
+                    current.distance < best.distance ? current : best
+                );
+
+                addLog(`🏆 ${closest.clientName}'s guess (${closest.value}) is CLOSEST! Setting as new target...`, 'success');
+                pendingGuesses = [];
+                
+                setTimeout(() => {
+                    processProposal(closest.value, 'GUESS', closest.clientName);
+                }, 500);
+            }, 500);
+        }
+
+        function crashLeader() {
+            const leader = nodes.find(n => n.role === 'leader');
+            if (!leader) return;
+
+            leader.status = 'crashed';
+            addLog(`💥 LEADER CRASH! Node ${leader.id} has stopped responding`, 'error');
+            updateGamePhase('⚠️ Leader crashed! Election in progress...', 'rgba(239, 68, 68, 0.3)');
+            renderNodes();
+
+            setTimeout(() => electNewLeader(), 1500);
+        }
+
+        function electNewLeader() {
+            addLog('🗳️ ELECTION STARTED - Followers detecting leader failure...', 'election');
+
+            const activeFollowers = nodes.filter(n => n.role === 'follower' && n.status === 'active');
+            
+            if (activeFollowers.length === 0) {
+                addLog('❌ No active followers available for election', 'error');
+                return;
+            }
+
+            const newLeader = activeFollowers.reduce((best, current) => {
+                if (current.epoch > best.epoch) return current;
+                if (current.epoch === best.epoch && current.seq > best.seq) return current;
+                if (current.epoch === best.epoch && current.seq === best.seq && current.id < best.id) return current;
+                return best;
+            });
+
+            setTimeout(() => {
+                activeFollowers.forEach((follower, index) => {
+                    setTimeout(() => {
+                        addLog(`🗳️ Node ${follower.id} votes for Node ${newLeader.id}`, 'election');
+                    }, index * 300);
+                });
+
+                setTimeout(() => {
+                    const crashedLeader = nodes.find(n => n.role === 'leader' && n.status === 'crashed');
+                    if (crashedLeader) crashedLeader.role = 'follower';
+
+                    newLeader.role = 'leader';
+                    newLeader.epoch++;
+
+                    addLog(`👑 Node ${newLeader.id} ELECTED as new leader!`, 'election');
+                    addLog(`✨ New epoch ${newLeader.epoch} begins`, 'success');
+                    updateGamePhase('✅ New leader elected! Continue playing!', 'rgba(16, 185, 129, 0.3)');
+                    
+                    renderNodes();
+                    renderClients();
+                }, activeFollowers.length * 300 + 500);
+            }, 1000);
+        }
+
+        function renderNodes() {
+            const container = document.getElementById('nodesContainer');
+            container.innerHTML = nodes.map(node => `
+                <div class="node ${node.role === 'leader' ? 'node-leader' : ''} ${node.status === 'crashed' ? 'node-crashed' : ''}">
+                    <div class="node-header">
+                        <span class="node-title">Node ${node.id}</span>
+                        <span class="badge ${node.status === 'crashed' ? 'badge-crashed' : node.role === 'leader' ? 'badge-leader' : 'badge-follower'}">
+                            ${node.status === 'crashed' ? 'CRASHED' : node.role.toUpperCase()}
+                        </span>
+                    </div>
+                    <div class="node-stats">
+                        <div class="stat-item">
+                            <div class="stat-label">Epoch</div>
+                            <div class="stat-value">${node.epoch}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Sequence</div>
+                            <div class="stat-value">${node.seq}</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">Log Size</div>
+                            <div class="stat-value">${node.log.length}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderClients() {
+            const container = document.getElementById('clientsContainer');
+            const isFirstRound = currentTarget === null;
+            
+            container.innerHTML = clients.map(client => `
+                <div class="client">
+                    <div class="client-header">
+                        <div class="client-name">
+                            <div class="client-dot pulse-animation" style="background: ${client.color}"></div>
+                            <span>${client.name}</span>
+                        </div>
+                        <div class="client-connection">→ Node ${client.connected}</div>
+                    </div>
+                    <div class="client-controls">
+                        <input 
+                            type="number" 
+                            class="client-input" 
+                            id="input-${client.id}" 
+                            min="0" 
+                            max="100" 
+                            placeholder="Enter 0-100"
+                        />
+                        <button 
+                            class="btn-action ${isFirstRound ? 'btn-set-target' : ''}" 
+                            onclick="handleClientAction(${client.id})"
+                        >
+                            ${isFirstRound ? '🎯 Set Target (First!)' : '🎲 Make Guess'}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logsContainer');
+            container.innerHTML = logs.slice(-50).reverse().map(log => `
+                <div class="log-entry log-${log.type}">
+                    <span class="log-timestamp">[${log.timestamp}]</span>
+                    <span>${log.message}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderAll() {
+            renderNodes();
+            renderClients();
+            renderLogs();
+        }
+
+        function handleClientAction(clientId) {
+            const input = document.getElementById(`input-${clientId}`);
+            const value = input.value;
+
+            if (!value || value < 0 || value > 100) {
+                alert('Please enter a number between 0 and 100');
+                return;
+            }
+
+            if (currentTarget === null) {
+                handleWrite(clientId, value);
+            } else {
+                handleGuess(clientId, value);
+            }
+
+            input.value = '';
+        }
+
+        window.onload = () => {
+            initializeSystem();
+        };
+    </script>
+</body>
+</html>
