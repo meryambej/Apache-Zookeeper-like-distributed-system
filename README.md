@@ -1,42 +1,43 @@
-# 🦋 ZooKeeper-like Distributed Coordination System
-# *A lightweight, educational replica of ZooKeeper with leader election, log replication, and fault tolerance.*
+# 🧑🏻‍🌾 Apache ZooKeeper-like Distributed Coordination System
 
-This project implements a simplified version of the ZooKeeper Atomic Broadcast (ZAB) model.
-It demonstrates how distributed systems maintain consistency, order, and availability through:
+A lightweight educational implementation inspired by ZooKeeper, featuring leader election, log replication, and basic fault tolerance.
 
-- Leader Election
-- State & Log Replication
-- Quorum-based Commits
-- Fault Detection & Recovery
-- A distributed Number Guessing Game to visualize state updates
+This project demonstrates core distributed-systems principles using a simplified version of the ZooKeeper Atomic Broadcast (ZAB) model.  
+It illustrates how a cluster maintains consistency and availability through:
 
-Ideal for learning how real-world systems like ZooKeeper, etcd, and Consul coordinate distributed nodes.
+- Leader election
+- State and log replication
+- Quorum-based commits
+- Fault detection and recovery
+- A small distributed number-guessing game to visualize state updates
 
-# 📌 Features
+It serves as a practical introduction to coordination services such as ZooKeeper, etcd, and Consul.
 
-##  Core System
-- Dynamic Leader Election
-- ZAB-style Log Replication
-- Quorum Commit Mechanism
-- Crash Detection & Automatic Recovery
-- Cluster State Synchronization
+# Features
 
-##  Interactive Game Layer
-A simple distributed game to demonstrate replicated state behavior:
+## Core System
+- Dynamic leader election
+- ZAB-style log replication
+- Quorum commit mechanism
+- Crash detection and automated recovery
+- Cluster state synchronization
 
-- First client sets the target number (0–100)
+## Interactive Game Layer
+A minimal distributed game designed to show replicated state behavior:
+
+- The first client sets a target number (0–100)
 - Other clients submit guesses
 - The closest guess becomes the new global target
-- Every update is replicated and committed across the cluster
+- All updates are replicated and committed across the cluster
 
-##  Optional Visualization
-The included `index.html` file provides a minimal interface to visualize node status.
-The backend works fully standalone.
+## Optional Visualization
+The included `index.html` file provides a simple interface for visualizing node states.  
+The backend operates fully independently and does not rely on the UI.
 
-#  Quick Start
+# Quick Start
 
 ## 1. Start the Cluster (Backend)
-Launch five nodes, each in its own terminal:
+Start five nodes, each in its own terminal:
 
 python zookeeper_server.py node 0
 python zookeeper_server.py node 1
@@ -44,57 +45,47 @@ python zookeeper_server.py node 2
 python zookeeper_server.py node 3
 python zookeeper_server.py node 4
 
-Nodes will automatically:
-- Discover each other
-- Elect a leader
-- Begin log/state replication
+Each node will:
+- Discover peer nodes
+- Participate in leader election
+- Begin log and state replication
 
-## 2. Optional: Open the Visualization
-Simply open:
+## 2. Optional: UI Visualization
+Open the file:
 
 index.html
 
-This provides a lightweight cluster overview.
+This provides a basic view of the cluster and the committed values.
 
-## 3. Simulate a Leader Crash
-To test fault tolerance:
+## 3. Simulating a Leader Crash
+To test failure handling, stop the current leader process:
 
-Ctrl + C   # in the leader’s terminal
+Ctrl + C
 
 The cluster will:
-- Detect the crash
-- Re-elect a leader
-- Continue serving requests
+- Detect the failure
+- Trigger a new leader election
+- Resume normal operation
 
-#  Game Rules (Distributed Number Guessing)
+# Game Rules (Distributed Number Guessing)
 
-- First client sets a target number (0–100)
-- Other clients guess
-- The closest guess becomes the new target
-- Update is broadcast, replicated, and committed on all nodes
+- The first client selects a target number (0–100)
+- Other clients propose guesses
+- The closest guess becomes the new committed target
+- The state is broadcast and replicated across all nodes
 
-# 📁 Project Structure
+# Project Structure
 
-.
-├── zookeeper_server.py      # Distributed node implementation
-├── index.html               # Optional visualization
-├── README.md                # Documentation
-└── logs/                    # Optional log output
+- zookeeper_server.py      # Node implementation
+- index.html               # Optional visualization tool
+- README.md                # Project documentation
+- logs/                    # Optional log output directory
 
-# 🛠️ Technologies & Concepts
 
-- Python
-- Socket-based communication
-- Distributed consensus
-- Leader-based coordination
-- Quorum voting
-- Fault-tolerant replication
-- Basic recovery mechanisms
+# Project Purpose
 
-# 📘 Purpose
-
-Perfect for:
+This project is intended for:
 - Students learning distributed systems
-- Classroom demos
-- Understanding ZooKeeper internals
-- Experimenting with replication & consensus models
+- Demonstrations and teaching material
+- Understanding ZooKeeper-inspired coordination
+- Experimentation with replication and consensus concepts
